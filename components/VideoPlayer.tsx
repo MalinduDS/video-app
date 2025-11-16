@@ -284,12 +284,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             ctx.save();
             ctx.globalAlpha = opacity;
             
-            if ('src' in overlay) {
-                const img = imageElementsRef.current[overlay.src];
-                if (img) {
-                    drawImageOverlay(ctx, overlay, transform, img);
-                }
-            }
+            if ('src' in overlay) drawImageOverlay(ctx, overlay, transform);
             if ('text' in overlay) drawTextOverlay(ctx, overlay, transform);
 
             ctx.restore();
@@ -417,7 +412,9 @@ const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay, tr
     ctx.restore();
 };
 
-const drawImageOverlay = (ctx: CanvasRenderingContext2D, overlay: ImageOverlay, transform: {x:number, y:number, scale:number}, img: HTMLImageElement) => {
+const drawImageOverlay = (ctx: CanvasRenderingContext2D, overlay: ImageOverlay, transform: {x:number, y:number, scale:number}) => {
+    const img = new Image();
+    img.src = overlay.src;
     if (!img.complete || img.width === 0) return;
 
     const canvasWidth = ctx.canvas.width;

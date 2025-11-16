@@ -11,9 +11,6 @@ import ExportDialog from './components/ExportDialog';
 import EditingToolsPanel from './components/EditingToolsPanel';
 import ClipManager from './components/ClipManager';
 import TransitionControls from './components/TransitionControls';
-import VideoGenerator from './components/VideoGenerator';
-import { GoogleGenAI } from "@google/genai";
-import { VideoSparkIcon } from './components/icons';
 
 const FILTERS: Filter[] = [
   { name: 'None', value: 'none' },
@@ -93,33 +90,9 @@ const App: React.FC = () => {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState<boolean>(false);
 
   const [isCropping, setIsCropping] = useState<boolean>(false);
-  
-  const [isApiKeySelected, setIsApiKeySelected] = useState(false);
-  const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
-  const [generationProgressMessage, setGenerationProgressMessage] = useState('');
 
   const videoRefA = useRef<HTMLVideoElement>(null);
   const videoRefB = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const checkKey = async () => {
-        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-            const hasKey = await window.aistudio.hasSelectedApiKey();
-            setIsApiKeySelected(hasKey);
-        }
-        setIsCheckingApiKey(false);
-    };
-    checkKey();
-  }, []);
-
-  const handleSelectApiKey = async () => {
-      if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-          await window.aistudio.openSelectKey();
-          // Per guidelines, assume success to avoid race condition
-          setIsApiKeySelected(true);
-      }
-  };
 
   useEffect(() => {
     [videoRefA, videoRefB].forEach(ref => {
@@ -178,7 +151,7 @@ const App: React.FC = () => {
   }, [isPlaying, lastFrameTime, playbackSpeed, totalDuration, currentTime]);
 
 
-  const handleAddClip = useCallback((file: File, index: 0 | 1) => {
+  const handleAddClip = (file: File, index: 0 | 1) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement('video');
     video.preload = 'metadata';
@@ -225,7 +198,7 @@ const App: React.FC = () => {
       alert("There was an error loading the video file.");
       URL.revokeObjectURL(url);
     };
-  }, [setEditorState]);
+  };
 
   const handleRemoveClip = (index: 0 | 1) => {
     setEditorState(prev => {
@@ -414,81 +387,6 @@ const App: React.FC = () => {
     setCurrentTime(0);
     setIsPlaying(false);
   };
-
-  const handleGenerateVideo = useCallback(async (prompt: string, aspectRatio: '16:9' | '9:16') => {
-    setIsGeneratingVideo(true);
-    setGenerationProgressMessage('Initializing generation...');
-    
-    try {
-        // Per guidelines, create new instance before each call
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        
-        let operation = await ai.models.generateVideos({
-            model: 'veo-3.1-fast-generate-preview',
-            prompt: prompt,
-            config: {
-                numberOfVideos: 1,
-                resolution: '720p', // Keep it 720p for faster generation
-                aspectRatio: aspectRatio
-            }
-        });
-
-        const pollingMessages = [
-            'Analyzing prompt...',
-            'Warming up the pixels...',
-            'Composing the scene...',
-            'Directing the action...',
-            'Rendering frames...',
-            'Almost there...',
-        ];
-        let messageIndex = 0;
-
-        while (!operation.done) {
-            setGenerationProgressMessage(pollingMessages[messageIndex % pollingMessages.length]);
-            messageIndex++;
-            await new Promise(resolve => setTimeout(resolve, 10000));
-            operation = await ai.operations.getVideosOperation({ operation: operation });
-        }
-
-        setGenerationProgressMessage('Finalizing video...');
-
-        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (!downloadLink) {
-            throw new Error('Video generation failed: No download link found.');
-        }
-
-        const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-        if (!response.ok) {
-             if (response.status === 404) {
-                const errorText = await response.text();
-                if (errorText.includes("Requested entity was not found.")) {
-                    // Per guidelines, reset API key state
-                    setIsApiKeySelected(false);
-                    throw new Error("API Key is invalid. Please select a valid API key.");
-                }
-            }
-            throw new Error(`Failed to download video: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
-        const videoFile = new File([blob], `generated-video-${Date.now()}.mp4`, { type: 'video/mp4' });
-
-        // Add to the first empty clip slot or replace the first clip
-        const targetIndex = clipA ? (clipB ? 0 : 1) : 0;
-        handleAddClip(videoFile, targetIndex as 0 | 1);
-
-        setGenerationProgressMessage('Video added to timeline!');
-
-    } catch (error) {
-        console.error('Video generation error:', error);
-        alert(`Video generation failed: ${error instanceof Error ? error.message : String(error)}`);
-        setGenerationProgressMessage('');
-    } finally {
-        setTimeout(() => {
-            setIsGeneratingVideo(false);
-        }, 3000); // Keep success/final message for a bit
-    }
-  }, [clipA, clipB, handleAddClip]);
 
   const globalFilter = [
     selectedFilter.value,
@@ -947,33 +845,6 @@ const App: React.FC = () => {
   }, [clips, transition, textOverlays, imageOverlays, selectedFilter, selectedEffect, crop, volume, playbackSpeed, totalDuration, durationA, transitionDuration]);
 
   const hasVideo = clips.length > 0;
-  
-  if (isCheckingApiKey) {
-    return (
-        <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-            Loading...
-        </div>
-    );
-  }
-
-  if (!isApiKeySelected) {
-      return (
-          <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white p-8 text-center">
-              <VideoSparkIcon className="w-16 h-16 text-indigo-400 mb-4" />
-              <h1 className="text-2xl font-bold mb-2">Welcome to Video Editor Pro</h1>
-              <p className="text-gray-400 mb-6 max-w-md">To use AI-powered video generation, you need to select a Google AI Studio API key. This feature is part of a paid service.</p>
-              <button
-                  onClick={handleSelectApiKey}
-                  className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-500 transition-colors"
-              >
-                  Select API Key
-              </button>
-              <p className="text-xs text-gray-500 mt-4">
-                  For more information about pricing, see the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline hover:text-indigo-400">billing documentation</a>.
-              </p>
-          </div>
-      );
-  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white font-sans">
@@ -1006,11 +877,6 @@ const App: React.FC = () => {
 
       <main className="flex-grow flex p-4 gap-4 overflow-hidden">
         <div className="w-1/3 flex flex-col gap-4">
-          <VideoGenerator
-            onGenerate={handleGenerateVideo}
-            isGenerating={isGeneratingVideo}
-            progressMessage={generationProgressMessage}
-          />
           <ClipManager 
             clipA={clipA}
             clipB={clipB}
@@ -1056,7 +922,7 @@ const App: React.FC = () => {
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-500">
-                Generate or upload a video to start editing
+                Upload a video to start editing
               </div>
             )}
           </div>
