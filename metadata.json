@@ -1,0 +1,5 @@
+{
+  "name": "Video Editor Pro",
+  "description": "A powerful, in-browser video editor inspired by CapCut. Trim your videos, add text overlays, apply filters, and export your creations right from your web browser without any subscriptions.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Editor Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        background-color: #1a1a1a;
+        color: #f0f0f0;
+      }
+
+      /* Text Overlay Animations */
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+      @keyframes slideInLeft { from { transform: translate(-150%, -50%); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+      @keyframes slideOutLeft { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(-150%, -50%); opacity: 0; } }
+
+      @keyframes slideInRight { from { transform: translate(50%, -50%); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+      @keyframes slideOutRight { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(50%, -50%); opacity: 0; } }
+
+      @keyframes slideInTop { from { transform: translate(-50%, -150%); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+      @keyframes slideOutTop { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(-50%, -150%); opacity: 0; } }
+      
+      @keyframes slideInBottom { from { transform: translate(-50%, 50%); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+      @keyframes slideOutBottom { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(-50%, 50%); opacity: 0; } }
+
+      @keyframes slideInCenter { from { transform: translate(-50%, -50%) scale(0); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+      @keyframes slideOutCenter { from { transform: translate(-50%, -50%) scale(1); opacity: 1; } to { transform: translate(-50%, -50%) scale(0); opacity: 0; } }
+
+
+      .text-overlay-animate {
+        animation-duration: 0.5s;
+        animation-timing-function: ease-out;
+        animation-fill-mode: forwards;
+      }
+      .animate-fade-in { animation-name: fadeIn; }
+      .animate-fade-out { animation-name: fadeOut; }
+      .animate-slide-in-left { animation-name: slideInLeft; }
+      .animate-slide-out-left { animation-name: slideOutLeft; }
+      .animate-slide-in-right { animation-name: slideInRight; }
+      .animate-slide-out-right { animation-name: slideOutRight; }
+      .animate-slide-in-top { animation-name: slideInTop; }
+      .animate-slide-out-top { animation-name: slideOutTop; }
+      .animate-slide-in-bottom { animation-name: slideInBottom; }
+      .animate-slide-out-bottom { animation-name: slideOutBottom; }
+      .animate-slide-in-center { animation-name: slideInCenter; }
+      .animate-slide-out-center { animation-name: slideOutCenter; }
+
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^0.20.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
