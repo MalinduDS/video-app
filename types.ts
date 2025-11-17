@@ -32,6 +32,7 @@ export interface TextOverlay {
   fontSize: number; // in pixels
   animationIn: AnimationInType;
   animationOut: AnimationOutType;
+  zIndex: number;
   mask: Mask;
 }
 
@@ -45,6 +46,7 @@ export interface ImageOverlay {
   left: number; // percentage
   animationIn: AnimationInType;
   animationOut: AnimationOutType;
+  zIndex: number;
   mask: Mask;
   chromaKey: ChromaKeySettings;
 }

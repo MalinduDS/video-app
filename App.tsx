@@ -95,6 +95,20 @@ const App: React.FC = () => {
   const videoRefB = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    if (videoRefA.current && clipA?.url) {
+        if (videoRefA.current.src !== clipA.url) {
+            videoRefA.current.src = clipA.url;
+        }
+    }
+    if (videoRefB.current && clipB?.url) {
+        if (videoRefB.current.src !== clipB.url) {
+            videoRefB.current.src = clipB.url;
+        }
+    }
+  }, [clipA?.url, clipB?.url]);
+
+
+  useEffect(() => {
     [videoRefA, videoRefB].forEach(ref => {
       if (ref.current) ref.current.volume = volume;
     });
@@ -260,6 +274,7 @@ const App: React.FC = () => {
       fontSize: 48,
       animationIn: 'fade-in',
       animationOut: 'fade-out',
+      zIndex: 0, // Placeholder, will be set on save
       mask: { shape: 'none', cornerRadius: 0, feather: 0, customSvg: null },
     };
     setSelectedTextOverlay(newOverlay);
@@ -268,13 +283,19 @@ const App: React.FC = () => {
 
   const handleSaveTextOverlay = (overlay: TextOverlay) => {
     setEditorState(prev => {
-        const index = prev.textOverlays.findIndex(o => o.id === overlay.id);
-        const newOverlays = [...prev.textOverlays];
-        if (index > -1) {
-            newOverlays[index] = overlay;
-        } else {
-            newOverlays.push(overlay);
+        const isNew = !prev.textOverlays.some(o => o.id === overlay.id);
+        let finalOverlay = overlay;
+        
+        if (isNew) {
+            const allOverlays = [...prev.textOverlays, ...prev.imageOverlays];
+            const maxZIndex = allOverlays.reduce((max, o) => Math.max(max, o.zIndex), 0);
+            finalOverlay = { ...overlay, zIndex: maxZIndex + 1 };
         }
+        
+        const newOverlays = isNew
+            ? [...prev.textOverlays, finalOverlay]
+            : prev.textOverlays.map(o => o.id === finalOverlay.id ? finalOverlay : o);
+
         return {...prev, textOverlays: newOverlays};
     });
     setIsTextEditorOpen(false);
@@ -300,6 +321,7 @@ const App: React.FC = () => {
           left: 50,
           animationIn: 'fade-in',
           animationOut: 'fade-out',
+          zIndex: 0, // Placeholder, will be set on save
           mask: { shape: 'none', cornerRadius: 0, feather: 0, customSvg: null },
           chromaKey: DEFAULT_CHROMA_KEY,
         };
@@ -314,18 +336,58 @@ const App: React.FC = () => {
   
   const handleSaveImageOverlay = (overlay: ImageOverlay) => {
     setEditorState(prev => {
-        const index = prev.imageOverlays.findIndex(o => o.id === overlay.id);
-        const newOverlays = [...prev.imageOverlays];
-        if (index > -1) {
-            newOverlays[index] = overlay;
-        } else {
-            newOverlays.push(overlay);
+        const isNew = !prev.imageOverlays.some(o => o.id === overlay.id);
+        let finalOverlay = overlay;
+
+        if (isNew) {
+            const allOverlays = [...prev.textOverlays, ...prev.imageOverlays];
+            const maxZIndex = allOverlays.reduce((max, o) => Math.max(max, o.zIndex), 0);
+            finalOverlay = { ...overlay, zIndex: maxZIndex + 1 };
         }
+
+        const newOverlays = isNew
+            ? [...prev.imageOverlays, finalOverlay]
+            : prev.imageOverlays.map(o => o.id === finalOverlay.id ? finalOverlay : o);
+            
         return {...prev, imageOverlays: newOverlays };
     });
     setIsImageEditorOpen(false);
     setSelectedImageOverlay(null);
   };
+
+  const handleReorderOverlay = (overlayId: string, direction: 'up' | 'down') => {
+    setEditorState(prev => {
+        const allOverlays = [...prev.textOverlays, ...prev.imageOverlays].sort((a, b) => a.zIndex - b.zIndex);
+        const currentIndex = allOverlays.findIndex(o => o.id === overlayId);
+        
+        if (currentIndex === -1) return prev;
+
+        let newZIndexMap = new Map<string, number>();
+
+        if (direction === 'up' && currentIndex < allOverlays.length - 1) {
+            const overlayA = allOverlays[currentIndex];
+            const overlayB = allOverlays[currentIndex + 1];
+            newZIndexMap.set(overlayA.id, overlayB.zIndex);
+            newZIndexMap.set(overlayB.id, overlayA.zIndex);
+        } else if (direction === 'down' && currentIndex > 0) {
+            const overlayA = allOverlays[currentIndex];
+            const overlayB = allOverlays[currentIndex - 1];
+            newZIndexMap.set(overlayA.id, overlayB.zIndex);
+            newZIndexMap.set(overlayB.id, overlayA.zIndex);
+        } else {
+            return prev;
+        }
+
+        const newTextOverlays = prev.textOverlays.map(o => newZIndexMap.has(o.id) ? { ...o, zIndex: newZIndexMap.get(o.id)! } : o);
+        const newImageOverlays = prev.imageOverlays.map(o => newZIndexMap.has(o.id) ? { ...o, zIndex: newZIndexMap.get(o.id)! } : o);
+
+        return {
+            ...prev,
+            textOverlays: newTextOverlays,
+            imageOverlays: newImageOverlays,
+        };
+    });
+};
 
   const handleSetTransition = (newTransition: Transition) => {
     setEditorState(prev => ({...prev, transition: newTransition}));
@@ -775,14 +837,16 @@ const App: React.FC = () => {
             await drawVideoToCanvas(videoA, clipA, currentExportTime, 1);
         }
 
-        const imageOverlaysToDraw = imageOverlays.filter(overlay => currentExportTime >= overlay.startTime && currentExportTime <= overlay.endTime);
-        for (const overlay of imageOverlaysToDraw) {
-            await drawImageToCanvas(overlay);
-        }
-        
-        const textOverlaysToDraw = textOverlays.filter(overlay => currentExportTime >= overlay.startTime && currentExportTime <= overlay.endTime);
-        for (const overlay of textOverlaysToDraw) {
-            drawTextToCanvas(overlay);
+        const overlaysToDraw = [...textOverlays, ...imageOverlays]
+            .filter(overlay => currentExportTime >= overlay.startTime && currentExportTime <= overlay.endTime)
+            .sort((a, b) => a.zIndex - b.zIndex);
+            
+        for (const overlay of overlaysToDraw) {
+            if ('text' in overlay) {
+                drawTextToCanvas(overlay);
+            } else if ('src' in overlay) {
+                await drawImageToCanvas(overlay);
+            }
         }
 
         currentExportTime += frameDuration * playbackSpeed;
@@ -846,6 +910,10 @@ const App: React.FC = () => {
 
   const hasVideo = clips.length > 0;
 
+  const allOverlaysSorted = [...textOverlays, ...imageOverlays].sort((a, b) => a.zIndex - b.zIndex);
+  const selectedTextOverlayInfo = allOverlaysSorted.find(o => o.id === selectedTextOverlay?.id);
+  const selectedImageOverlayInfo = allOverlaysSorted.find(o => o.id === selectedImageOverlay?.id);
+
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white font-sans">
       {isExporting && <Spinner progress={exportProgress} />}
@@ -854,6 +922,9 @@ const App: React.FC = () => {
           overlay={selectedTextOverlay}
           onSave={handleSaveTextOverlay}
           onClose={() => setIsTextEditorOpen(false)}
+          onReorder={(direction) => handleReorderOverlay(selectedTextOverlay.id, direction)}
+          isTopLayer={selectedTextOverlayInfo ? selectedTextOverlayInfo.zIndex === allOverlaysSorted[allOverlaysSorted.length - 1]?.zIndex : true}
+          isBottomLayer={selectedTextOverlayInfo ? selectedTextOverlayInfo.zIndex === allOverlaysSorted[0]?.zIndex : true}
         />
       )}
       {isImageEditorOpen && selectedImageOverlay && (
@@ -861,6 +932,9 @@ const App: React.FC = () => {
           overlay={selectedImageOverlay}
           onSave={handleSaveImageOverlay}
           onClose={() => setIsImageEditorOpen(false)}
+          onReorder={(direction) => handleReorderOverlay(selectedImageOverlay.id, direction)}
+          isTopLayer={selectedImageOverlayInfo ? selectedTextOverlayInfo.zIndex === allOverlaysSorted[allOverlaysSorted.length - 1]?.zIndex : true}
+          isBottomLayer={selectedImageOverlayInfo ? selectedImageOverlayInfo.zIndex === allOverlaysSorted[0]?.zIndex : true}
         />
       )}
       {isExportDialogOpen && (
@@ -870,6 +944,10 @@ const App: React.FC = () => {
           />
       )}
       <input type="file" ref={imageFileInputRef} onChange={handleImageFileChange} accept="image/*" className="hidden" />
+      
+      {/* Hidden video elements for processing */}
+      <video ref={videoRefA} className="hidden" muted playsInline crossOrigin="anonymous" />
+      <video ref={videoRefB} className="hidden" muted playsInline crossOrigin="anonymous" />
 
       <header className="bg-gray-800 p-2 text-center text-xl font-bold shadow-md">
         Video Editor Pro

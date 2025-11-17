@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TextOverlay, AnimationInType, AnimationOutType } from '../types';
-import { XIcon } from './icons';
+import { XIcon, ArrowUpIcon, ArrowDownIcon } from './icons';
 
 interface TextOverlayEditorProps {
   overlay: TextOverlay;
   onSave: (overlay: TextOverlay) => void;
   onClose: () => void;
+  onReorder: (direction: 'up' | 'down') => void;
+  isTopLayer: boolean;
+  isBottomLayer: boolean;
 }
 
 const ANIMATION_IN_OPTIONS: { value: AnimationInType, label: string }[] = [
@@ -29,7 +32,7 @@ const ANIMATION_OUT_OPTIONS: { value: AnimationOutType, label: string }[] = [
 ];
 
 
-const TextOverlayEditor: React.FC<TextOverlayEditorProps> = ({ overlay, onSave, onClose }) => {
+const TextOverlayEditor: React.FC<TextOverlayEditorProps> = ({ overlay, onSave, onClose, onReorder, isTopLayer, isBottomLayer }) => {
   const [editedOverlay, setEditedOverlay] = useState<TextOverlay>(overlay);
   const svgMaskInputRef = useRef<HTMLInputElement>(null);
 
@@ -146,6 +149,26 @@ const TextOverlayEditor: React.FC<TextOverlayEditorProps> = ({ overlay, onSave, 
               >
                 {ANIMATION_OUT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-700">
+            <h3 className="text-lg font-medium text-gray-200 mb-2">Layering (Stack Order)</h3>
+            <div className="flex gap-2">
+                <button 
+                    onClick={() => onReorder('up')} 
+                    disabled={isTopLayer}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+                >
+                    <ArrowUpIcon className="w-5 h-5"/> Bring Forward
+                </button>
+                <button 
+                    onClick={() => onReorder('down')} 
+                    disabled={isBottomLayer}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+                >
+                    <ArrowDownIcon className="w-5 h-5"/> Send Backward
+                </button>
             </div>
           </div>
 

@@ -11,6 +11,21 @@ interface TimelineProps {
   onTimeChange: (time: number) => void;
 }
 
+const OverlayBar: React.FC<{ overlay: TextOverlay | ImageOverlay, duration: number, className: string }> = ({ overlay, duration, className }) => {
+    const left = duration > 0 ? (overlay.startTime / duration) * 100 : 0;
+    const width = duration > 0 ? ((overlay.endTime - overlay.startTime) / duration) * 100 : 0;
+    return (
+        <div 
+            className={`absolute h-3 rounded flex items-center justify-center ${className}`} 
+            style={{ left: `${left}%`, width: `${width}%`}}
+            title={`Layer ${overlay.zIndex}`}
+        >
+            <span className="text-white text-[8px] font-bold opacity-70">{overlay.zIndex}</span>
+        </div>
+    )
+}
+
+
 const Timeline: React.FC<TimelineProps> = ({
   duration,
   currentTime,
@@ -88,22 +103,14 @@ const Timeline: React.FC<TimelineProps> = ({
                 )}
                 
                 {/* Image Overlays */}
-                {imageOverlays.map(overlay => {
-                    const left = duration > 0 ? (overlay.startTime / duration) * 100 : 0;
-                    const width = duration > 0 ? ((overlay.endTime - overlay.startTime) / duration) * 100 : 0;
-                    return (
-                        <div key={overlay.id} className="absolute bottom-6 h-3 bg-yellow-500/70 rounded" style={{ left: `${left}%`, width: `${width}%`}}></div>
-                    )
-                })}
+                {imageOverlays.map(overlay => (
+                   <OverlayBar key={overlay.id} overlay={overlay} duration={duration} className="bottom-6 bg-yellow-500/70" />
+                ))}
 
                  {/* Text Overlays */}
-                {textOverlays.map(overlay => {
-                    const left = duration > 0 ? (overlay.startTime / duration) * 100 : 0;
-                    const width = duration > 0 ? ((overlay.endTime - overlay.startTime) / duration) * 100 : 0;
-                    return (
-                        <div key={overlay.id} className="absolute bottom-1 h-3 bg-pink-500/70 rounded" style={{ left: `${left}%`, width: `${width}%`}}></div>
-                    )
-                })}
+                {textOverlays.map(overlay => (
+                    <OverlayBar key={overlay.id} overlay={overlay} duration={duration} className="bottom-1 bg-pink-500/70" />
+                ))}
             </div>
         </div>
 

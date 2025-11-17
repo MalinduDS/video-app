@@ -277,15 +277,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         
         // --- Overlay Drawing Logic ---
-        [...imageOverlays, ...textOverlays].forEach(overlay => {
+        const overlaysToDraw = [...imageOverlays, ...textOverlays].sort((a, b) => a.zIndex - b.zIndex);
+        
+        overlaysToDraw.forEach(overlay => {
             const { isVisible, opacity, transform } = getOverlayRenderState(overlay, currentTime);
             if (!isVisible) return;
             
             ctx.save();
             ctx.globalAlpha = opacity;
             
-            if ('src' in overlay) drawImageOverlay(ctx, overlay, transform);
-            if ('text' in overlay) drawTextOverlay(ctx, overlay, transform);
+            if ('src' in overlay) drawImageOverlay(ctx, overlay, transform, imageElementsRef.current, maskImagesRef.current);
+            if ('text' in overlay) drawTextOverlay(ctx, overlay, transform, maskImagesRef.current);
 
             ctx.restore();
         });
@@ -300,21 +302,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             if (!vidA || !clipA) return;
 
             const timeWithinClipA = currentTime;
-            const seekTimeA = clipA.isReversed 
-                ? clipA.trimEnd - timeWithinClipA 
+            const seekTimeA = clipA.isReversed
+                ? clipA.trimEnd - timeWithinClipA
                 : clipA.trimStart + timeWithinClipA;
 
             if (Math.abs(vidA.currentTime - seekTimeA) > 0.2) {
                 vidA.currentTime = seekTimeA;
             }
 
-            const timeWithinClipB = currentTime - transitionStartTime;
-            const seekTimeB = clipB?.isReversed
-                ? clipB.trimEnd - timeWithinClipB
-                : clipB.trimStart + timeWithinClipB;
+            if (clipB && vidB) {
+                const timeWithinClipB = currentTime - transitionStartTime;
+                const seekTimeB = clipB.isReversed
+                    ? clipB.trimEnd - timeWithinClipB
+                    : clipB.trimStart + timeWithinClipB;
 
-            if (clipB && vidB && Math.abs(vidB.currentTime - seekTimeB) > 0.2) {
-                vidB.currentTime = seekTimeB;
+                if (Math.abs(vidB.currentTime - seekTimeB) > 0.2) {
+                    vidB.currentTime = seekTimeB;
+                }
             }
         };
         
@@ -371,7 +375,7 @@ const applyChromaKey = (imageData: ImageData, settings: ChromaKeySettings) => {
     }
 };
 
-const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay, transform: {x:number, y:number, scale:number}) => {
+const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay, transform: {x:number, y:number, scale:number}, maskImageCache: Record<string, HTMLImageElement>) => {
     const { text, left, top, color, fontSize } = overlay;
     
     const tempCanvas = document.createElement('canvas');
@@ -393,7 +397,7 @@ const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay, tr
     tempCtx.textBaseline = 'middle';
     tempCtx.fillText(text, textWidth / 2, textHeight / 2);
 
-    if(overlay.mask) applyCanvasMask(tempCtx, overlay.mask, textWidth, textHeight, {});
+    if(overlay.mask) applyCanvasMask(tempCtx, overlay.mask, textWidth, textHeight, maskImageCache);
 
     const canvasWidth = ctx.canvas.width;
     const canvasHeight = ctx.canvas.height;
@@ -412,10 +416,9 @@ const drawTextOverlay = (ctx: CanvasRenderingContext2D, overlay: TextOverlay, tr
     ctx.restore();
 };
 
-const drawImageOverlay = (ctx: CanvasRenderingContext2D, overlay: ImageOverlay, transform: {x:number, y:number, scale:number}) => {
-    const img = new Image();
-    img.src = overlay.src;
-    if (!img.complete || img.width === 0) return;
+const drawImageOverlay = (ctx: CanvasRenderingContext2D, overlay: ImageOverlay, transform: {x:number, y:number, scale:number}, imageCache: Record<string, HTMLImageElement>, maskImageCache: Record<string, HTMLImageElement>) => {
+    const img = imageCache[overlay.src];
+    if (!img || !img.complete || img.width === 0) return;
 
     const canvasWidth = ctx.canvas.width;
     const canvasHeight = ctx.canvas.height;
@@ -450,7 +453,7 @@ const drawImageOverlay = (ctx: CanvasRenderingContext2D, overlay: ImageOverlay, 
     
     tempCtx.drawImage(imageToDraw, 0, 0, overlayWidth, overlayHeight);
 
-    if (overlay.mask) applyCanvasMask(tempCtx, overlay.mask, overlayWidth, overlayHeight, {});
+    if (overlay.mask) applyCanvasMask(tempCtx, overlay.mask, overlayWidth, overlayHeight, maskImageCache);
     
     ctx.save();
     ctx.translate(x, y);
